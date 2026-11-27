@@ -49,4 +49,5 @@ runtime:
   db_path: .atsa/atsa.db
   reports_dir: reports
   workers: 0                  # backtest processes, 0 = auto
+  parallel_symbols: 3         # markets hunted at the same time
   interval_minutes: 60        # --forever: pause between hunts

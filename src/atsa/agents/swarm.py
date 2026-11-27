@@ -6,6 +6,7 @@ import asyncio
 import logging
 import time
 from dataclasses import dataclass, field
+from typing import Callable
 
 from pydantic import ValidationError
 
@@ -48,10 +49,13 @@ def parse_strategies(text: str, agent: str, generation: int) -> tuple[list[Strat
 
 
 class Swarm:
-    def __init__(self, provider: LLMProvider, swarm_cfg: SwarmConfig, bt_cfg: BacktestConfig):
+    def __init__(self, provider: LLMProvider, swarm_cfg: SwarmConfig, bt_cfg: BacktestConfig,
+                 on_event: Callable[..., None] | None = None, symbol: str = ""):
         self.provider = provider
         self.cfg = swarm_cfg
         self.bt = bt_cfg
+        self.symbol = symbol
+        self._emit = on_event or (lambda *a, **k: None)
         self._sem = asyncio.Semaphore(max(1, swarm_cfg.concurrency))
 
     async def _run_agent(self, agent: str, brief: dict, n: int, generation: int,
@@ -60,6 +64,7 @@ class Swarm:
         rep = AgentReport(agent=agent)
         t0 = time.perf_counter()
         async with self._sem:
+            self._emit("agent_start", symbol=self.symbol, agent=agent, generation=generation)
             try:
                 text = await self.provider.complete(
                     system_prompt(persona),
@@ -73,6 +78,7 @@ class Swarm:
                 rep.error = f"{type(e).__name__}: {e}"
                 log.warning("agent %s failed: %s", agent, rep.error)
         rep.seconds = time.perf_counter() - t0
+        self._emit("agent_done", symbol=self.symbol, agent=agent, generation=generation, report=rep)
         return rep
 
     async def research(self, brief: dict, generation: int = 1, leaders: list[dict] | None = None,

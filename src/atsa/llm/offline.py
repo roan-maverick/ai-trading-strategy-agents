@@ -298,6 +298,7 @@ class OfflineProvider(LLMProvider):
         super().__init__(cfg, client)
         self.model = self.default_model
         self.seed = seed
+        self.latency: tuple[float, float] | None = None  # simulate LLM think-time (live demo visuals)
 
     async def complete(self, system: str, user: str, meta: dict | None = None) -> str:
         meta = meta or {}
@@ -309,6 +310,10 @@ class OfflineProvider(LLMProvider):
         base_seed = self.seed if self.seed is not None else random.randrange(1 << 30)
         rng = random.Random(f"{base_seed}:{persona}:{gen}:{brief.get('symbol')}")
         self.usage["calls"] += 1
+        if self.latency:
+            import asyncio
+
+            await asyncio.sleep(random.uniform(*self.latency))  # separate RNG: same ideas with or without latency
         leaders = meta.get("leaders") or []
         out = []
         for _ in range(n):

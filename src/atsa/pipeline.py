@@ -23,6 +23,7 @@ import asyncio
 import logging
 import time
 from dataclasses import dataclass, field
+from typing import Callable
 
 from rich.console import Console
 
@@ -79,11 +80,20 @@ class CycleResult:
 
 class Pipeline:
     def __init__(self, settings: Settings, provider: LLMProvider | None = None, console: Console | None = None,
-                 quiet: bool = False):
+                 quiet: bool = False, on_event: Callable[..., None] | None = None):
         self.s = settings
         self.provider = provider or get_provider(settings.llm, seed=settings.swarm.seed)
         self.console = console or Console(quiet=quiet)
         self.store = Store(settings.runtime.db_path)
+        self.on_event = on_event
+
+    def emit(self, event: str, **data) -> None:
+        """Hook for live UIs / monitoring. Never lets a UI error break the hunt."""
+        if self.on_event is not None:
+            try:
+                self.on_event(event, **data)
+            except Exception:  # noqa: BLE001
+                log.exception("event handler failed for %s", event)
 
     def _ppy(self) -> float:
         return self.s.data.periods_per_year or infer_periods_per_year(self.s.data.interval, self.s.data.source)
@@ -107,6 +117,7 @@ class Pipeline:
         ppy = self._ppy()
         brief = analyze(bars, ppy)
         res = SymbolResult(symbol=symbol, brief=brief)
+        self.emit("symbol_start", symbol=symbol, bars=bars, brief=brief)
         mc = brief["market_character"]
         c.print(f"\n[bold cyan]>> {symbol}[/] {len(bars)} bars {bars.start_date}->{bars.end_date} | "
                 f"{brief['trend']['state']} | vol {brief['volatility']['regime']} | {mc['verdict']} | "
@@ -114,7 +125,7 @@ class Pipeline:
 
         evaluator = Evaluator(bars)
         seen: set[str] = set()
-        swarm = Swarm(self.provider, cfg.swarm, cfg.backtest)
+        swarm = Swarm(self.provider, cfg.swarm, cfg.backtest, on_event=self.emit, symbol=symbol)
 
         champions = [s for s in self._champions(symbol) if s.id not in seen]
         if champions:
@@ -122,6 +133,8 @@ class Pipeline:
             evals = await asyncio.to_thread(evaluate_many, bars, champions, cfg.backtest, ppy,
                                             cfg.runtime.workers, evaluator)
             res.evaluations.extend(evals)
+            apply_gate(res.evaluations, cfg.gate)
+            self.emit("evals", symbol=symbol, generation=0, evals=evals)
             c.print(f"   [dim]re-validating {len(champions)} champion(s) from previous cycles on fresh data[/]")
 
         leaders: list[dict] = []
@@ -145,6 +158,7 @@ class Pipeline:
             t_bt = time.perf_counter() - t1
             res.evaluations.extend(evals)
             apply_gate(res.evaluations, cfg.gate)
+            self.emit("evals", symbol=symbol, generation=gen, evals=evals, seconds=t_bt)
             ranked = sorted([e for e in res.evaluations if not e.error], key=raw_score, reverse=True)
             leaders = [e.to_dict() for e in ranked[: cfg.swarm.evolve_top_k]]
             gen_fails = sorted([e for e in evals if not e.passed and not e.error], key=raw_score, reverse=True)
@@ -167,6 +181,7 @@ class Pipeline:
 
         # final gate: Deflated Sharpe counts every independent idea tried on this symbol this cycle
         apply_gate(res.evaluations, cfg.gate)
+        self.emit("symbol_done", symbol=symbol, result=res)
         return res
 
     async def run_cycle(self) -> CycleResult:
@@ -178,14 +193,24 @@ class Pipeline:
                            f"{cfg.swarm.generations} generations | data: {cfg.data.source} {cfg.data.interval}")
         results: list[SymbolResult] = []
         status = "ok"
-        try:
-            for sym in cfg.data.symbols:
+        self.emit("cycle_start", run_id=run_id, model=self.provider.describe(), symbols=list(cfg.data.symbols))
+        sem = asyncio.Semaphore(max(1, cfg.runtime.parallel_symbols))
+
+        async def guarded(sym: str) -> SymbolResult | None:
+            nonlocal status
+            async with sem:
                 try:
-                    results.append(await self.hunt_symbol(sym, run_id))
+                    return await self.hunt_symbol(sym, run_id)
                 except Exception as e:  # noqa: BLE001 - keep hunting other symbols
                     status = "partial"
                     self.console.print(f"[red]   {sym} failed: {type(e).__name__}: {e}[/]")
+                    self.emit("symbol_error", symbol=sym, error=f"{type(e).__name__}: {e}")
                     log.exception("symbol %s failed", sym)
+                    return None
+
+        try:
+            done = await asyncio.gather(*(guarded(sym) for sym in cfg.data.symbols))
+            results = [r for r in done if r is not None]
             for r in results:
                 for ev in r.evaluations:
                     if ev.error:
@@ -207,6 +232,7 @@ class Pipeline:
                                {"tested": cyc.tested, "seconds": seconds, "passed": len(cyc.winners)})
         cyc.report_md, cyc.report_json = str(md), str(js)
         self.store.finish_run(run_id, cyc.tested, len(cyc.winners), status, dict(self.provider.usage), str(md))
+        self.emit("cycle_done", cycle=cyc)
         return cyc
 
     def close(self) -> None:

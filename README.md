@@ -1,125 +1,171 @@
 <div align="center">
 
-# 🤖📈 AI Trading Strategy Agents
+# AI Trading Strategy Agents
 
-### Your own AI quant research desk that never sleeps.
+**An open-source, LLM-agnostic quant research desk that discovers, stress-tests and ranks trading strategies around the clock.**
 
-**Plug in any LLM → it spins up a team of AI agents → they research the market 24/7, find mispricings,
-invent trading strategies, backtest them on years of data → and hand you ONLY the winners.**
+Plug in any language model. A team of AI agents researches the market in parallel, proposes strategies, backtests them
+on years of data and hands you only the ones that survive a strict robustness gate.
 
-[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Any LLM](https://img.shields.io/badge/LLM-Gemini%20%7C%20GPT%20%7C%20Claude%20%7C%20Llama%20%7C%20any-purple.svg)](#-plug-in-any-llm)
-[![Default: Gemini 4 Neon](https://img.shields.io/badge/default-Gemini%204%20Neon-orange.svg)](#-plug-in-any-llm)
-[![Backtests](https://img.shields.io/badge/backtests-50k%2Fmin-red.svg)](#-speed)
+[![CI](https://github.com/roan-maverick/ai-trading-strategy-agents/actions/workflows/ci.yml/badge.svg)](https://github.com/roan-maverick/ai-trading-strategy-agents/actions/workflows/ci.yml)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-3776AB.svg)](https://www.python.org/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-2ea44f.svg)](LICENSE)
+[![Models](https://img.shields.io/badge/models-Gemini%20%7C%20GPT%20%7C%20Claude%20%7C%20Llama%20%7C%20any-8957e5.svg)](#supported-models)
+[![Default model](https://img.shields.io/badge/default-Gemini%204%20Neon-e8710a.svg)](#supported-models)
 
-**`Gemini 4 Neon` + `ai-trading-strategy-agents` = a quant team working for you around the clock.**
+<img src="docs/assets/atsa_live.gif" alt="atsa live: six markets, seven agents in parallel, hundreds of strategies backtested and filtered in seconds" width="100%">
+
+<sub><code>atsa live --demo</code>: six markets, seven research agents in parallel, 635 strategies backtested and filtered,
+winners ranked live. Recorded with the offline provider on the synthetic demo market (playback 3x).</sub>
 
 </div>
 
-<p align="center"><img src="docs/assets/demo.svg" alt="atsa demo: 557 strategies tested, 19 survived" width="100%"></p>
+---
+
+## Overview
+
+| | |
+|---|---|
+| **Research agents** | 6 specialists plus an evolver, all running concurrently, across multiple symbols at once |
+| **Backtest core** | Numba JIT, about 7 µs per 10-year daily backtest, about 50,000 full scorecards per minute per core |
+| **Robustness gate** | 7 tests, including out-of-sample Sharpe, walk-forward stability, 2x cost stress and the Deflated Sharpe Ratio |
+| **Models** | Gemini 4 Neon by default; OpenAI, Anthropic, OpenRouter, Groq, DeepSeek, xAI, local models, or no model at all |
+| **Output** | Ranked leaderboard, live signals, a web dashboard and a JSON hand-off file for trading bots |
+| **Operation** | Runs once or 24/7, re-validates yesterday's winners on fresh data and demotes them when they decay |
+
+**Gemini 4 Neon + ai-trading-strategy-agents = a quant research team that never sleeps.**
+When the next model ships, change one flag.
 
 ---
 
-## ⚡ Try it in 60 seconds (no API key needed)
+## Quick start
 
 ```bash
 git clone https://github.com/roan-maverick/ai-trading-strategy-agents.git
 cd ai-trading-strategy-agents
 pip install -e ".[all]"
 
-atsa demo        # offline agents hunt a synthetic market with hidden edges, in ~5 seconds
+atsa live --demo     # full-screen command center, no API key required
+atsa demo            # the same hunt as a plain terminal report
 ```
 
-The demo hides real inefficiencies inside a fake market. Then it lets the swarm loose to see if it can find them.
-**It does.** Out of ~550 strategies tested, a handful survive. They're exactly the ones exploiting the hidden edge.
+The demo market is synthetic and contains hidden, known inefficiencies. The swarm is not told what they are. Out of
+roughly 550 strategies tested per run, only a handful survive, and they are the ones exploiting the hidden edge.
+That is the point of the demo: it shows the machinery finds real structure and rejects noise.
 
-Now point it at real markets with a real brain:
+<details>
+<summary>Sample output of <code>atsa demo</code></summary>
+<br>
+<img src="docs/assets/demo.svg" alt="atsa demo output" width="100%">
+</details>
+
+Then point it at real markets and a real model:
 
 ```bash
-export GEMINI_API_KEY=your_key_here
+export GEMINI_API_KEY=your_key
 
-atsa run --provider gemini --model gemini-4-neon \
-         --source binance --symbols BTCUSDT,ETHUSDT,SOLUSDT --forever
+atsa live --provider gemini --model gemini-4-neon \
+          --source binance --symbols BTCUSDT,ETHUSDT,SOLUSDT --forever
 ```
 
-That's it. It now runs **24/7**: it refreshes data, does research, generates ideas, backtests, filters, evolves and saves the winners. Then it does it all again.
+With `--forever` it loops: refresh data, research, generate, backtest, filter, evolve, store, repeat.
 
 ---
 
-## 🧠 How it works
+## Live command center
+
+`atsa live` is a full-screen terminal dashboard for the hunt:
+
+| Panel | What it shows |
+|---|---|
+| **Market** | Live Binance prices (or a high-speed replay for other sources) with tick sparklines and per-symbol hunt progress |
+| **Agent swarm** | Every agent's state in real time: thinking, ready, ideas produced, latest idea |
+| **Backtest engine** | Each strategy as it is scored: pass or fail, Sharpe in and out of sample, Deflated Sharpe, and the reason it was rejected |
+| **Robustness gate** | A funnel showing how many strategies survive each of the seven tests |
+| **Winners** | The best distinct strategies so far, updated live |
+| **Research** | The analyst's current read of each market: regime, fair value, mispricing, shock behaviour |
+
+Record your own clip with your own model: `python scripts/record_live.py --provider gemini --source binance --symbols BTCUSDT,ETHUSDT`.
+
+---
+
+## How it works
 
 ```mermaid
 flowchart LR
-    D[(Market data<br/>Binance · Yahoo · CSV)] --> A[🔬 Quant Analyst<br/>trend · volatility regime · Hurst<br/>fair value · mispricing z-score<br/>event study · seasonality]
-    A --> S{{🤖 AI Agent Swarm<br/>runs in parallel}}
+    D[(Market data<br/>Binance, Yahoo, CSV)] --> A[Quant Analyst<br/>regime, volatility, Hurst<br/>fair value, mispricing<br/>event study, seasonality]
+    A --> S{{Agent swarm<br/>parallel LLM calls}}
     S --> M1[Momentum Hunter]
     S --> M2[Mean-Reversion Sniper]
     S --> M3[Volatility Breakout]
     S --> M4[Fair-Value Arbitrageur]
     S --> M5[Regime Strategist]
     S --> M6[Seasonality Miner]
-    M1 & M2 & M3 & M4 & M5 & M6 --> V[🛡️ Safe validator<br/>LLM output is never executed]
-    V --> B[⚡ JIT backtester<br/>~7 µs per 10-year test]
-    B --> G[🚦 Robustness Gate<br/>7 tests, all must pass]
-    G -->|leaders + rejects fed back| E[🧬 Strategy Evolver]
+    M1 & M2 & M3 & M4 & M5 & M6 --> V[Validator<br/>LLM output is never executed]
+    V --> B[JIT backtester<br/>next-open fills, costs]
+    B --> G[Robustness gate<br/>7 tests]
+    G -->|leaders and rejects| E[Strategy Evolver]
     E --> S
-    G -->|winners only| W[🏆 Leaderboard<br/>+ live signals + JSON for your bot]
+    G -->|winners| W[Leaderboard, signals,<br/>dashboard, bot JSON]
 ```
 
-1. **Research.** A quant analyst (pure math, no LLM) reads the market. It measures trend, volatility regime, Hurst exponent, mean-reversion half-life and 3 fair-value models with mispricing z-scores. It also runs an event study ("what happens after a crash bar?") and checks calendar effects.
-2. **Ideas.** Six specialist AI agents read that brief at the same time. Each one proposes strategies in its own style.
-3. **Backtest.** Every idea is checked for safety and backtested on years of data, with realistic fills and costs.
-4. **Filter.** A brutal robustness gate kills anything that looks lucky, fragile or overfit.
-5. **Evolve.** The best strategies and the reasons others failed go back to the agents, who come up with better versions. This repeats for several generations.
-6. **Repeat forever.** Yesterday's winners are re-tested on fresh data every cycle. If they stop working, they get demoted.
+1. **Research.** A quant analyst (pure statistics, no LLM) builds a brief for each market: trend and volatility regime,
+   Hurst exponent, variance ratio, mean-reversion half-life, three fair-value models with mispricing z-scores, an event
+   study of what follows shock bars, and calendar seasonality.
+2. **Ideation.** Six specialist agents read the brief concurrently and propose strategies in a strict rule language.
+3. **Validation.** Every rule is parsed against a whitelist. Nothing the model writes is executed as code.
+4. **Backtesting.** Strategies are simulated with signals at the close, fills at the next open, intrabar stops,
+   fees and slippage.
+5. **Gating.** Seven robustness tests remove anything lucky, fragile or overfit.
+6. **Evolution.** Leaders and the reasons others failed are fed back; agents produce improved variants for several generations.
+7. **Persistence.** Winners are stored, re-tested every cycle on fresh data, and demoted if they stop working.
 
 ---
 
-## 🚦 Only winners get through
+## The robustness gate
 
-Most "AI trading bots" show you one beautiful backtest. That's how you lose money: if you try 500 random strategies, a few of them will *always* look amazing by pure luck.
+Run 500 random strategies and a few will always look excellent by chance. The gate is designed to reject them.
+A strategy is reported as a winner only if it passes every test:
 
-**This engine is built to kill those.** A strategy is a winner only if it passes **every** test:
-
-| # | Test | What it catches |
+| # | Test | What it rejects |
 |---|---|---|
-| 1 | **≥ 20 trades** | "Strategies" that got lucky 3 times |
-| 2 | **Sharpe ≥ 0.5 in-sample** | Ideas with no edge at all |
-| 3 | **Sharpe ≥ 0.5 out-of-sample** (last 30% of history, never seen during selection) | Classic overfitting: great in the past, dead today |
-| 4 | **Max drawdown ≤ 35%** | Strategies you could never actually sit through |
-| 5 | **Walk-forward: profitable in ≥ 60% of time periods** | One lucky year carrying the whole backtest |
-| 6 | **Still profitable at 2× fees + slippage** | Edges that only exist on paper |
-| 7 | **Deflated Sharpe Ratio ≥ 0.90** | **Luck from testing many ideas.** It adjusts for how many *independent* ideas the swarm tried (Bailey & López de Prado, 2014) |
+| 1 | At least 20 trades | Results driven by a handful of lucky trades |
+| 2 | Sharpe ≥ 0.5 in-sample | Ideas with no edge |
+| 3 | Sharpe ≥ 0.5 out-of-sample (the last 30% of history, never used for selection) | Classic overfitting |
+| 4 | Maximum drawdown ≤ 35% | Strategies no one could hold through |
+| 5 | Positive Sharpe in at least 60% of walk-forward periods | One good year carrying the whole backtest |
+| 6 | Still profitable at 2x fees and slippage | Edges that exist only on paper |
+| 7 | Deflated Sharpe Ratio ≥ 0.90 (Bailey and López de Prado, 2014) | Selection luck from testing many ideas. Trials are correlation-clustered, so 30 re-tunes of one idea count as one idea. |
 
-Every threshold can be changed in `atsa.yaml`. Every rejection comes with a reason, and those reasons are fed back to the agents so the next generation improves.
+All thresholds live in `atsa.yaml`. Every rejection carries its reason, and those reasons are fed back to the agents.
+Winners are grouped by idea cluster, so you receive distinct edges rather than twenty copies of one.
 
 ---
 
-## 🔌 Plug in any LLM
+## Supported models
 
-Swap the "brain" with one flag. No SDKs to install: every provider is a plain HTTP call.
+Each provider is a plain HTTP integration, with no vendor SDK dependencies.
 
-| Provider | Command | Key |
+| Provider | Usage | Key |
 |---|---|---|
-| **Google Gemini 4 Neon** (default) | `--provider gemini --model gemini-4-neon` | `GEMINI_API_KEY` |
+| Google Gemini 4 Neon (default) | `--provider gemini --model gemini-4-neon` | `GEMINI_API_KEY` |
 | OpenAI | `--provider openai --model <model-id>` | `OPENAI_API_KEY` |
-| Anthropic Claude | `--provider anthropic --model claude-opus-5-5` | `ANTHROPIC_API_KEY` |
-| OpenRouter (hundreds of models) | `--provider openrouter --model <vendor/model>` | `OPENROUTER_API_KEY` |
+| Anthropic | `--provider anthropic --model claude-opus-5-5` | `ANTHROPIC_API_KEY` |
+| OpenRouter | `--provider openrouter --model <vendor/model>` | `OPENROUTER_API_KEY` |
 | Vercel AI Gateway | `--provider vercel --model google/gemini-4-neon` | `AI_GATEWAY_API_KEY` |
-| Groq · DeepSeek · xAI · Together · Mistral | `--provider groq` (etc.) `--model <model-id>` | `<PROVIDER>_API_KEY` |
-| **Local models** (Ollama, LM Studio, vLLM) | `--provider ollama --model <model>` | none |
-| Any OpenAI-compatible server | `--provider custom` + `base_url` in config | optional |
-| **Offline** (no LLM, quant templates) | `--provider offline` | none |
+| Groq, DeepSeek, xAI, Together, Mistral | `--provider <name> --model <model-id>` | `<NAME>_API_KEY` |
+| Ollama, LM Studio, vLLM (local) | `--provider ollama --model <model>` | not required |
+| Any OpenAI-compatible endpoint | `--provider custom` with `llm.base_url` | optional |
+| Offline quant templates | `--provider offline` | not required |
 
-New model drops tomorrow? Change `--model` and you're running it. Run `atsa providers` to see which keys are set.
-Gemini 4 thinking depth can be tuned with `llm.thinking_level: low | medium | high | xhigh`.
+`atsa providers` lists which keys are configured. For Gemini 4, reasoning depth is set with
+`llm.thinking_level: low | medium | high | xhigh`. Adding a provider takes about 20 lines; see [docs/PROVIDERS.md](docs/PROVIDERS.md).
 
 ---
 
-## 🏆 Hand the winners to your trading bot
+## Bot integration
 
-Every cycle writes `reports/winners_latest.json`, a clean contract your bot can read (this entry is from the demo run):
+Each cycle writes `reports/winners_latest.json`. The entry below is from the demo run:
 
 ```json
 {
@@ -138,132 +184,133 @@ Every cycle writes `reports/winners_latest.json`, a clean contract your bot can 
 ```
 
 ```bash
-atsa signals          # what every winner wants to hold at the next open, on the latest data
-atsa export bot.json  # top strategies as JSON
-atsa dashboard        # live web leaderboard at http://127.0.0.1:8000
+atsa signals           # target position of every winner at the next open, on the latest data
+atsa export bot.json   # top strategies as JSON
+atsa dashboard         # web leaderboard at http://127.0.0.1:8000
 ```
 
-Strategies are plain readable rules (`rsi(close,14) < 30 and close > sma(close,200)`), so you can port them to any bot, exchange or language. See [`examples/bot_integration.py`](examples/bot_integration.py).
+Rules are readable expressions such as `rsi(close,14) < 30 and close > sma(close,200)`, so they port to any bot,
+exchange or language. A minimal integration is in [examples/bot_integration.py](examples/bot_integration.py).
 
-<p align="center"><img src="docs/assets/dashboard.png" alt="Live dashboard" width="100%"></p>
+<img src="docs/assets/dashboard.png" alt="Web dashboard" width="100%">
 
 ---
 
-## ⚡ Speed
+## Performance
 
-| What | Measured |
+| Measurement | Result |
 |---|---|
-| Core backtest (10 years of daily bars, stops + costs) | **~7 µs** |
-| Full scorecard per strategy (signals, in/out-of-sample, walk-forward, 2× cost re-run) | **~850 / second / core** |
-| Strategies scored per minute | **~50,000 per core**, scales across cores |
+| Core simulation, 10 years of daily bars with stops and costs | ~7 µs |
+| Full scorecard per strategy (signals, in/out-of-sample, walk-forward, 2x-cost re-run) | ~850 per second per core |
+| Strategies scored per minute | ~50,000 per core, scaling across cores |
 
-Measured with `atsa bench` on one 2.1 GHz cloud vCPU. Run it on your machine and post your numbers.
-The LLM is the slow part (seconds per call), so agents run concurrently and the backtester never makes them wait.
+Measured with `atsa bench` on a single 2.1 GHz cloud vCPU. The LLM is the slow step, so agents and symbols run
+concurrently and the backtester never holds them up.
 
 ---
 
-## 🧱 Tech stack
+## Architecture and tech stack
 
-| Layer | Choice | Why |
+| Layer | Choice | Reason |
 |---|---|---|
-| Language | **Python 3.10+** | Every quant and every LLM speaks it |
-| Backtest core | **Numba JIT** (LLVM-compiled loops, `nogil`) | C-level speed, no C toolchain needed |
-| Data | **NumPy** columnar arrays + **Polars** + **Parquet** cache | Zero-copy, fast loads, works offline after first fetch |
-| Strategy language | Safe **AST-whitelisted expression DSL**, memoised indicators | LLM output is *validated*, never `eval`'d; shared indicator cache across thousands of strategies |
-| Agents | **asyncio** fan-out + semaphore | All agents think in parallel |
-| LLM layer | **httpx** raw HTTP, retries + backoff | Any provider, no vendor SDK lock-in |
-| Parallelism | `ProcessPoolExecutor` (forkserver) | Uses every core for big batches |
-| Storage | **SQLite** (WAL) | Zero-ops leaderboard, safe for runner + dashboard together |
-| Interfaces | **Typer + Rich** CLI, **FastAPI** dashboard | Pretty terminal, live web view |
-| Ops | **Docker** + docker-compose, GitHub Actions CI | `docker compose up -d` = 24/7 hunter |
+| Language | Python 3.10+ | The common language of quants and LLM tooling |
+| Backtest core | Numba JIT (LLVM-compiled, `nogil`) | Compiled speed without a C toolchain |
+| Data | NumPy columnar arrays, Polars, Parquet cache | Zero-copy access, fast reloads, offline after first fetch |
+| Strategy language | AST-whitelisted expression DSL with memoised indicators | Safe by construction; one indicator computation shared by thousands of strategies |
+| Agents | asyncio fan-out with semaphores, parallel symbols | Concurrent research across agents and markets |
+| LLM layer | httpx with retries and exponential backoff | Any provider, no SDK lock-in |
+| Parallelism | ProcessPoolExecutor (forkserver) | All cores for large batches |
+| Storage | SQLite in WAL mode | Zero-ops; runner and dashboard read and write safely together |
+| Interfaces | Typer and Rich CLI, Rich Live terminal UI, FastAPI dashboard | Terminal-first with a web view |
+| Operations | Docker, docker-compose, GitHub Actions on Python 3.10 to 3.13 | One command to run 24/7 |
 
-Deep dive: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+Details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
 ---
 
-## 🛠️ Commands
+## CLI reference
 
-| Command | What it does |
+| Command | Description |
 |---|---|
-| `atsa demo` | Zero-setup demo on a synthetic market with hidden edges |
-| `atsa run [--forever]` | Run the hunt once, or 24/7 |
-| `atsa research BTCUSDT` | Show the live research brief the agents see |
-| `atsa backtest my.json` | Push your own strategy through the same gate |
+| `atsa live [--demo] [--forever]` | Full-screen live command center |
+| `atsa run [--forever]` | Run the hunt once or continuously, with plain log output |
+| `atsa demo` | Zero-setup demo report on the synthetic market |
+| `atsa research SYMBOL` | Print the research brief the agents receive |
+| `atsa backtest FILE.json` | Run your own strategies through the same gate |
 | `atsa leaderboard` | Best strategies found so far |
-| `atsa signals` | Current position for every winner |
-| `atsa export winners.json` | JSON hand-off for bots |
+| `atsa signals` | Current target position for every winner |
+| `atsa export FILE.json` | Export winners for a trading bot |
 | `atsa dashboard` | Web dashboard |
-| `atsa bench` | Measure speed on your machine |
-| `atsa providers` | List LLM providers + key status |
-| `atsa init` | Create `atsa.yaml` + `.env` |
+| `atsa bench` | Measure throughput on your machine |
+| `atsa providers` | List model providers and key status |
+| `atsa init` | Create `atsa.yaml` and `.env` |
 
 ---
 
-## 🌐 Data sources
+## Data sources
 
-| Source | Markets | Setup |
+| Source | Coverage | Setup |
 |---|---|---|
-| `binance` | Crypto (BTCUSDT, ETHUSDT, …), 1m → 1M bars, trades 24/7 | none (public data) |
-| `yahoo` | Stocks, ETFs, indices, FX, futures | included in `[all]` |
-| `csv` | Anything: your own OHLCV CSV/Parquet files | `data.path: ./data` |
-| `synthetic` | Demo market with planted edges | none |
+| `binance` | Spot crypto pairs, 1-minute to monthly bars | None (public market data) |
+| `yahoo` | Equities, ETFs, indices, FX, futures | Included in `[all]` |
+| `csv` | Your own OHLCV files, CSV or Parquet | `data.path` |
+| `synthetic` | Demo market with planted inefficiencies | None |
 
 ---
 
-## 🧬 Make it yours
+## Extending
 
-**Add your own agent:** just add a name. Any snake_case name becomes a new researcher:
+Add a research agent by name. Any snake_case name becomes a new researcher with its own mandate:
 
 ```yaml
 swarm:
-  agents: [momentum_hunter, fair_value_arbitrageur, crypto_funding_squeeze_hunter, my_secret_style]
+  agents: [momentum_hunter, fair_value_arbitrageur, funding_squeeze_hunter, my_house_style]
 ```
 
-**Write strategies by hand** and run them through the gate:
+Run hand-written strategies through the gate:
 
 ```bash
 atsa backtest examples/strategies/rsi_dip.json --symbol BTCUSDT --source binance
 ```
 
-**The strategy language** has 30+ functions: moving averages, RSI, MACD, ADX, ATR, Bollinger bands, stochastics, VWAP, regression fair value, mispricing gap, z-scores, percentile ranks, crossovers, calendar variables and more. See [`docs/STRATEGY_DSL.md`](docs/STRATEGY_DSL.md).
-
-**Add a new LLM provider** in about 20 lines: [`docs/PROVIDERS.md`](docs/PROVIDERS.md).
+The rule language has 30+ functions: moving averages, RSI, MACD, ADX, ATR, Bollinger bands, stochastics, VWAP,
+regression fair value, mispricing gap, z-scores, percentile ranks, crossovers and calendar variables.
+See [docs/STRATEGY_DSL.md](docs/STRATEGY_DSL.md).
 
 ---
 
-## 🐳 Run it 24/7 with Docker
+## Deployment
 
 ```bash
-cp .env.example .env              # add your GEMINI_API_KEY
-cp atsa.example.yaml atsa.yaml    # pick symbols, model, thresholds
-docker compose up -d              # hunter + dashboard on http://localhost:8000
+cp .env.example .env              # add GEMINI_API_KEY
+cp atsa.example.yaml atsa.yaml    # symbols, model, thresholds
+docker compose up -d              # 24/7 hunter + dashboard on http://localhost:8000
 ```
 
 ---
 
-## 🗺️ Roadmap
+## Roadmap
 
-- [ ] Multi-asset strategies (pairs / stat-arb across symbols)
-- [ ] Position sizing models (volatility targeting, Kelly fraction)
-- [ ] News & sentiment research agent (tool-calling)
-- [ ] Paper-trading connector (CCXT / Alpaca) driven by `atsa signals`
-- [ ] Combinatorial purged cross-validation (CPCV)
-- [ ] Strategy portfolio builder (combine uncorrelated winners)
+- Multi-asset strategies (pairs and statistical arbitrage)
+- Position sizing models (volatility targeting, fractional Kelly)
+- News and sentiment research agent with tool calling
+- Paper-trading connectors (CCXT, Alpaca) driven by `atsa signals`
+- Combinatorial purged cross-validation
+- Portfolio construction from uncorrelated winners
 
-PRs welcome. Agents, indicators and providers are each a single file to add.
+Contributions are welcome. Agents, indicators, providers and data sources are each a single file; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
-## ⚠️ Read this
+## Disclaimer
 
-This is a **research tool**, not financial advice and not a money printer. Backtests are hypothetical: past performance does not guarantee future results, and markets change. The gate removes a lot of junk, but it cannot remove all risk. **Paper-trade every strategy before you risk real capital**, and never trade money you can't afford to lose. You are responsible for your own trading decisions and for following the rules where you live.
+This project is a research tool. It is not financial advice and does not guarantee profits. Backtests are hypothetical,
+past performance does not predict future results, and markets change. The robustness gate removes many false positives
+but cannot remove risk. Paper-trade any strategy before committing capital, never trade money you cannot afford to lose,
+and make sure your use complies with the regulations that apply to you.
 
 ## License
 
-[MIT](LICENSE). Build on it, fork it, ship it.
+[MIT](LICENSE)
 
-<div align="center">
-
-**If this saved you a few thousand hours of quant research, drop a ⭐. It helps more people find it.**
-
-</div>
+If this project is useful to you, consider starring the repository so others can find it.

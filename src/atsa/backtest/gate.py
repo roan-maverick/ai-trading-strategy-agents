@@ -87,6 +87,15 @@ def apply_gate(evals: list[Evaluation], cfg: GateConfig, trial_sharpes: np.ndarr
             reasons.append(f"dies under 2x costs (Sharpe {ev.stress_sharpe:.2f})")
         if ev.dsr < cfg.min_dsr:
             reasons.append(f"deflated Sharpe {ev.dsr:.2f} < {cfg.min_dsr} (likely luck)")
+        ev.checks = {
+            "trades": f["trades"] >= cfg.min_trades,
+            "sharpe_is": i["sharpe"] >= cfg.min_sharpe_is,
+            "sharpe_oos": o["sharpe"] >= cfg.min_sharpe_oos,
+            "drawdown": f["max_drawdown"] <= cfg.max_drawdown,
+            "walk_forward": ev.wf_positive >= cfg.min_wf_positive,
+            "cost_stress": ev.stress_sharpe >= cfg.min_stress_sharpe,
+            "deflated_sharpe": ev.dsr >= cfg.min_dsr,
+        }
         ev.reasons = reasons
         ev.passed = not reasons
         ev.score = raw_score(ev) * max(ev.dsr, 0.0)

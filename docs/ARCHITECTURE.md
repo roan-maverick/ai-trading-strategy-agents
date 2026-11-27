@@ -29,6 +29,7 @@ src/atsa/
 │   ├── metrics.py         # Sharpe, Sortino, DD, PSR, DSR, trial clustering
 │   ├── gate.py            # Robustness gate + scoring + idea de-duplication
 │   └── parallel.py        # Multi-core evaluation
+├── tui.py                 # `atsa live` terminal command center (Rich Live) + frame recorder
 ├── store.py               # SQLite leaderboard + run history
 ├── report.py              # Markdown report + bot hand-off JSON
 └── dashboard/             # FastAPI + single-file HTML dashboard
@@ -79,6 +80,15 @@ Winners are grouped by idea cluster when they are reported, so your bot gets dis
 2. **Speed:** indicator calls are memoised per dataset, so 1,000 strategies sharing `sma(close,200)` compute it once.
 3. **Portability:** rules are readable strings that any bot, language or exchange integration can implement.
 4. **No look-ahead by construction:** every function is causal, and negative lags are impossible.
+
+## Events and the live UI
+
+`Pipeline(on_event=...)` emits `cycle_start`, `symbol_start`, `agent_start`, `agent_done`, `evals`, `symbol_done`,
+`symbol_error` and `cycle_done`. `atsa live` subscribes to them; you can plug the same hook into your own
+monitoring (Slack alerts, Prometheus, a trading bot that reacts to new winners).
+
+`runtime.parallel_symbols` hunts several markets at once. Research is LLM-latency bound, so with 3 parallel symbols
+and 7 agents, 21 model calls can be in flight at once.
 
 ## 24/7 mode
 

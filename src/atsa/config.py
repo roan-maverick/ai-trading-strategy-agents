@@ -91,6 +91,7 @@ class RuntimeConfig(BaseModel):
     db_path: str = ".atsa/atsa.db"
     reports_dir: str = "reports"
     workers: int = 0  # 0 -> auto (cpu count)
+    parallel_symbols: int = 1  # hunt several symbols at once (LLM latency bound -> big speed-up)
     interval_minutes: float = 60.0  # pause between cycles in --forever mode
 
 

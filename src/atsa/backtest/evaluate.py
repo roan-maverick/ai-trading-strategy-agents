@@ -36,6 +36,7 @@ class Evaluation:
     trials_eff: int = 0
     cluster: int = -1
     variants: int = 1
+    checks: dict = field(default_factory=dict)
     passed: bool = False
     score: float = 0.0
     reasons: list[str] = field(default_factory=list)
@@ -52,7 +53,7 @@ class Evaluation:
             "out_of_sample": self.out_of_sample, "wf_sharpes": self.wf_sharpes,
             "wf_positive": self.wf_positive, "stress_sharpe": self.stress_sharpe,
             "benchmark_sharpe": self.benchmark_sharpe, "dsr": self.dsr, "trials_eff": self.trials_eff,
-            "cluster": self.cluster, "variants": self.variants, "passed": self.passed,
+            "cluster": self.cluster, "variants": self.variants, "checks": self.checks, "passed": self.passed,
             "score": self.score, "reasons": self.reasons, "current_position": self.current_position,
             "next_position": self.next_position,
             "error": self.error,

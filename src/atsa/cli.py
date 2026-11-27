@@ -114,14 +114,7 @@ def demo(generations: int = typer.Option(4, help="evolution rounds"),
          workdir: Path = typer.Option(Path(".atsa-demo"), help="where the demo DB + reports go")):
     """60-second zero-setup demo: offline agents on a synthetic market with planted edges. No API key."""
     console.print(BANNER)
-    s = Settings()
-    s.llm.provider = "offline"
-    s.swarm.seed = seed
-    s.swarm.generations = generations
-    s.data.source = "synthetic"
-    s.data.symbols = ["DEMO-A", "DEMO-B", "DEMO-C", "DEMO-D"]
-    s.runtime.db_path = str(workdir / "atsa.db")
-    s.runtime.reports_dir = str(workdir / "reports")
+    s = _demo_settings(workdir, generations, seed, ["DEMO-A", "DEMO-B", "DEMO-C", "DEMO-D"])
     from .data import generate_bars
     from .pipeline import Pipeline
 
@@ -149,11 +142,14 @@ def run(config: Optional[Path] = typer.Option(None, "--config", "-c", help="YAML
         start: Optional[str] = typer.Option(None, help="history start date YYYY-MM-DD"),
         generations: Optional[int] = typer.Option(None, help="evolution rounds per cycle"),
         forever: bool = typer.Option(False, "--forever", help="run 24/7: hunt, sleep, refresh data, repeat"),
-        every: Optional[float] = typer.Option(None, help="minutes between cycles in --forever mode")):
+        every: Optional[float] = typer.Option(None, help="minutes between cycles in --forever mode"),
+        parallel: Optional[int] = typer.Option(None, help="symbols hunted at the same time")):
     """Run the strategy hunt (one cycle, or 24/7 with --forever)."""
     s = _settings(config, provider, model, symbols, source, interval, generations, start)
     if every:
         s.runtime.interval_minutes = every
+    if parallel:
+        s.runtime.parallel_symbols = parallel
     from .pipeline import Pipeline
 
     console.print(BANNER)
@@ -186,6 +182,48 @@ def run(config: Optional[Path] = typer.Option(None, "--config", "-c", help="YAML
         console.print("\n[yellow]Stopped.[/]")
     finally:
         pipe.close()
+
+
+def _demo_settings(workdir: Path, generations: int, seed: int, symbols: list[str]) -> Settings:
+    s = Settings()
+    s.llm.provider = "offline"
+    s.swarm.seed = seed
+    s.swarm.generations = generations
+    s.data.source = "synthetic"
+    s.data.symbols = symbols
+    s.runtime.db_path = str(workdir / "atsa.db")
+    s.runtime.reports_dir = str(workdir / "reports")
+    return s
+
+
+@app.command()
+def live(config: Optional[Path] = typer.Option(None, "--config", "-c", help="YAML config (default ./atsa.yaml)"),
+         provider: Optional[str] = typer.Option(None, help="gemini | openai | anthropic | openrouter | ollama | offline ..."),
+         model: Optional[str] = typer.Option(None, help="model id, e.g. gemini-4-neon"),
+         symbols: Optional[str] = typer.Option(None, help="comma separated, e.g. BTCUSDT,ETHUSDT,SOLUSDT"),
+         source: Optional[str] = typer.Option(None, help="synthetic | csv | yahoo | binance"),
+         interval: Optional[str] = typer.Option(None, help="1d, 4h, 1h ..."),
+         generations: Optional[int] = typer.Option(None, help="evolution rounds per cycle"),
+         parallel: int = typer.Option(3, help="symbols hunted at the same time"),
+         forever: bool = typer.Option(False, "--forever", help="keep hunting 24/7"),
+         demo_mode: bool = typer.Option(False, "--demo", help="no API key: offline agents on the synthetic market"),
+         fps: float = typer.Option(12.0, help="screen refresh rate")):
+    """Full-screen live command center: market tape, agent swarm, backtest feed, gate funnel, winners."""
+    from .llm import get_provider
+    from .tui import run_live
+
+    if demo_mode:
+        s = _demo_settings(Path(".atsa-demo"), generations or 3, 7,
+                           ["DEMO-A", "DEMO-B", "DEMO-C", "DEMO-D", "DEMO-E", "DEMO-F"])
+    else:
+        s = _settings(config, provider, model, symbols, source, interval, generations)
+    s.runtime.parallel_symbols = max(1, parallel)
+    prov = get_provider(s.llm, seed=s.swarm.seed)
+    if demo_mode:
+        prov.latency = (0.25, 0.9)  # show the agents "thinking" like a real LLM would
+    cycles = asyncio.run(run_live(s, prov, fps=fps, forever=forever))
+    for cyc in cycles[-1:]:
+        _print_cycle(cyc)
 
 
 @app.command()
