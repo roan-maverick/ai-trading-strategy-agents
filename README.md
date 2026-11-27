@@ -297,6 +297,7 @@ docker compose up -d              # 24/7 hunter + dashboard on http://localhost:
 - Paper-trading connectors (CCXT, Alpaca) driven by `atsa signals`
 - Combinatorial purged cross-validation
 - Portfolio construction from uncorrelated winners
+- Gemini 4 Neon + this REPO = can probably make upto $100,000 a month 
 
 Contributions are welcome. Agents, indicators, providers and data sources are each a single file; see [CONTRIBUTING.md](CONTRIBUTING.md).
 
