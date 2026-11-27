@@ -1,0 +1,71 @@
+"""Starter files written by `atsa init` (kept in sync with atsa.example.yaml / .env.example)."""
+
+YAML_TEMPLATE = """# AI Trading Strategy Agents - configuration
+# Every value here has a sensible default; delete what you don't need.
+
+llm:
+  provider: gemini            # gemini | openai | anthropic | openrouter | vercel | groq | deepseek | xai
+                              # | together | mistral | ollama | lmstudio | custom | offline
+  model: gemini-4-neon        # any model id your provider serves
+  temperature: 0.8
+  thinking_level: medium      # Gemini 4 only: low | medium | high | xhigh (remove to use the model default)
+  # base_url: http://localhost:11434/v1   # for ollama / lmstudio / custom OpenAI-compatible servers
+
+data:
+  source: binance             # synthetic | csv | yahoo | binance
+  symbols: [BTCUSDT, ETHUSDT, SOLUSDT]
+  interval: 1d                # 1d, 4h, 1h, 15m ...
+  start: "2019-01-01"
+  # path: ./data              # csv source: a file, or a folder with SYMBOL.csv / SYMBOL.parquet
+
+swarm:
+  agents:                     # add your own: any snake_case name becomes a custom researcher
+    - momentum_hunter
+    - mean_reversion_sniper
+    - volatility_breakout
+    - fair_value_arbitrageur
+    - regime_switcher
+    - seasonality_miner
+  strategies_per_agent: 6
+  generations: 3              # evolution rounds per cycle (leaders + rejects are fed back)
+  evolve_top_k: 8
+  concurrency: 6              # parallel LLM calls
+
+backtest:
+  fee_bps: 5                  # per side
+  slippage_bps: 5             # per side
+  allow_short: true
+  oos_fraction: 0.3           # last 30% of history is never shown to the selection step
+  wf_folds: 5
+
+gate:                         # a strategy must pass ALL of these to be called a winner
+  min_trades: 20
+  min_sharpe_is: 0.5
+  min_sharpe_oos: 0.5
+  max_drawdown: 0.35
+  min_wf_positive: 0.6        # share of walk-forward periods with positive Sharpe
+  min_dsr: 0.90               # Deflated Sharpe Ratio (multiple-testing / luck filter)
+  min_stress_sharpe: 0.25     # Sharpe with 2x fees + slippage
+
+runtime:
+  db_path: .atsa/atsa.db
+  reports_dir: reports
+  workers: 0                  # backtest processes, 0 = auto
+  interval_minutes: 60        # --forever: pause between hunts
+"""
+
+ENV_TEMPLATE = """# Put the key for the provider you use. Never commit this file.
+GEMINI_API_KEY=
+# OPENAI_API_KEY=
+# ANTHROPIC_API_KEY=
+# OPENROUTER_API_KEY=
+# AI_GATEWAY_API_KEY=        # Vercel AI Gateway (model: google/gemini-4-neon)
+# GROQ_API_KEY=
+# DEEPSEEK_API_KEY=
+# XAI_API_KEY=
+
+# Optional overrides (beat atsa.yaml)
+# ATSA_PROVIDER=gemini
+# ATSA_MODEL=gemini-4-neon
+# ATSA_SYMBOLS=BTCUSDT,ETHUSDT
+"""

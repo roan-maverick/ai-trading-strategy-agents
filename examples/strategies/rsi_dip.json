@@ -1,0 +1,26 @@
+{
+  "strategies": [
+    {
+      "name": "RSI(2) dip-buy in uptrend",
+      "thesis": "Short-term oversold dips inside a long-term uptrend tend to revert.",
+      "entry_long": "rsi(close,2) < 10 and close > sma(close,200)",
+      "exit_long": "rsi(close,2) > 70",
+      "stop_loss": 0.08
+    },
+    {
+      "name": "Fair-value mispricing fade",
+      "thesis": "Price more than 2 residual sigmas from its regression fair value converges back.",
+      "entry_long": "fv_gap(close,60) < -2",
+      "exit_long": "fv_gap(close,60) > 0",
+      "entry_short": "fv_gap(close,60) > 2",
+      "exit_short": "fv_gap(close,60) < 0",
+      "max_hold_bars": 30
+    },
+    {
+      "name": "Donchian 55/20 breakout with trend filter",
+      "thesis": "Breakouts to new highs in strong trends tend to continue.",
+      "entry_long": "close > lag(highest(high,55),1) and adx(14) > 20",
+      "exit_long": "close < lag(lowest(low,20),1)"
+    }
+  ]
+}

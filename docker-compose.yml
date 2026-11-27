@@ -1,0 +1,22 @@
+# docker compose up -d   ->  24/7 strategy hunter + dashboard on http://localhost:8000
+services:
+  hunter:
+    build: .
+    command: ["atsa", "run", "--forever"]
+    env_file: .env
+    volumes:
+      - ./atsa.yaml:/work/atsa.yaml:ro
+      - ./state:/work/.atsa
+      - ./reports:/work/reports
+    restart: unless-stopped
+
+  dashboard:
+    build: .
+    command: ["atsa", "dashboard", "--host", "0.0.0.0", "--port", "8000"]
+    volumes:
+      - ./atsa.yaml:/work/atsa.yaml:ro
+      - ./state:/work/.atsa
+    ports:
+      - "8000:8000"
+    depends_on: [hunter]
+    restart: unless-stopped

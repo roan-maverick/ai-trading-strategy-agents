@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Trading Strategy Agents - Dashboard</title>
+<style>
+  :root {
+    color-scheme: dark;
+    --bg: #0f1115; --surface-1: #171a21; --surface-2: #1f232c; --border: #2a2f3a;
+    --text-primary: #efefef; --text-secondary: #9c9c9c; --grid: #2a2f3a;
+    --series-1: #338ced; --good: #0aac23; --critical: #eb6263; --accent: #9887ef;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: light) {
+    :root:where(:not([data-theme="dark"])) {
+      color-scheme: light;
+      --bg: #f6f7f9; --surface-1: #ffffff; --surface-2: #f1f3f6; --border: #e2e5ea;
+      --text-primary: #191919; --text-secondary: #666666; --grid: #e6e8ec;
+      --series-1: #257de0; --good: #008a17; --critical: #ec4647; --accent: #6a4ce2;
+    }
+  }
+  :root[data-theme="light"] {
+    color-scheme: light;
+    --bg: #f6f7f9; --surface-1: #ffffff; --surface-2: #f1f3f6; --border: #e2e5ea;
+    --text-primary: #191919; --text-secondary: #666666; --grid: #e6e8ec;
+    --series-1: #257de0; --good: #008a17; --critical: #ec4647; --accent: #6a4ce2;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text-primary);
+         font: 14px/1.45 system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  header { display: flex; align-items: center; justify-content: space-between; padding: 18px 28px;
+           border-bottom: 1px solid var(--border); }
+  header h1 { font-size: 17px; margin: 0; letter-spacing: .2px; }
+  header h1 span { color: var(--accent); }
+  .muted { color: var(--text-secondary); }
+  main { padding: 22px 28px; display: grid; gap: 18px; max-width: 1500px; margin: 0 auto; }
+  .tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+  .tile { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+  .tile .label { color: var(--text-secondary); font-size: 12px; text-transform: uppercase; letter-spacing: .6px; }
+  .tile .value { font-size: 28px; font-weight: 650; margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .grid2 { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+  .card { background: var(--surface-1); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .card h2 { font-size: 14px; margin: 0; padding: 12px 16px; border-bottom: 1px solid var(--border);
+             display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+  table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  th, td { padding: 8px 9px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
+  th { color: var(--text-secondary); font-weight: 500; font-size: 12px; }
+  th:nth-child(-n+3), td:nth-child(-n+3) { text-align: left; }
+  td.name { max-width: 190px; overflow: hidden; text-overflow: ellipsis; }
+  .var { color: var(--text-secondary); font-size: 11px; margin-left: 4px; }
+  tbody tr { cursor: pointer; }
+  tbody tr:hover, tbody tr.sel { background: var(--surface-2); }
+  .pill { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; padding: 1px 8px;
+          border-radius: 999px; border: 1px solid var(--border); }
+  .pill.long::before { content: "\25B2"; color: var(--good); }
+  .pill.short::before { content: "\25BC"; color: var(--critical); }
+  .pill.flat::before { content: "\25CF"; color: var(--text-secondary); }
+  #detail { padding: 14px 16px; display: grid; gap: 12px; }
+  #chart { width: 100%; height: 240px; position: relative; }
+  #chart svg { width: 100%; height: 100%; display: block; }
+  .tip { position: absolute; pointer-events: none; background: var(--surface-2); border: 1px solid var(--border);
+         border-radius: 6px; padding: 4px 8px; font-size: 12px; font-variant-numeric: tabular-nums; display: none; }
+  pre { margin: 0; background: var(--surface-2); border-radius: 8px; padding: 10px 12px; font: 12px/1.5 var(--mono);
+        white-space: pre-wrap; word-break: break-word; }
+  .metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+  .metrics div { background: var(--surface-2); border-radius: 8px; padding: 8px 10px; }
+  .metrics b { display: block; font-size: 16px; font-variant-numeric: tabular-nums; }
+  .metrics span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; font-size: 11px; color: var(--text-secondary); text-transform: uppercase; letter-spacing: .5px; }
+  .verdict { font-weight: 600; }
+  .verdict.ok { color: var(--good); } .verdict.no { color: var(--critical); }
+  button, select { background: var(--surface-2); color: var(--text-primary); border: 1px solid var(--border);
+                   border-radius: 6px; padding: 5px 10px; font: inherit; font-size: 12px; cursor: pointer; }
+  .empty { padding: 28px 16px; color: var(--text-secondary); }
+  footer { text-align: center; color: var(--text-secondary); font-size: 12px; padding: 10px 0 24px; }
+  @media (max-width: 1000px) { .grid2 { grid-template-columns: 1fr; } .tiles { grid-template-columns: repeat(2, 1fr); } }
+</style>
+</head>
+<body>
+<header>
+  <h1>AI Trading Strategy <span>Agents</span> <span class="muted" style="font-weight:400">/ live leaderboard</span></h1>
+  <div style="display:flex;gap:8px;align-items:center">
+    <label class="muted" style="font-size:12px"><input type="checkbox" id="group" checked> group variants</label>
+    <label class="muted" style="font-size:12px"><input type="checkbox" id="showAll"> show rejected</label>
+    <button id="theme" title="Toggle theme">Theme</button>
+    <span class="muted" id="updated" style="font-size:12px"></span>
+  </div>
+</header>
+<main>
+  <section class="tiles">
+    <div class="tile"><div class="label">Winners</div><div class="value" id="kWinners">-</div></div>
+    <div class="tile"><div class="label">Strategies tested</div><div class="value" id="kTested">-</div></div>
+    <div class="tile"><div class="label">Best out-of-sample Sharpe</div><div class="value" id="kBest">-</div></div>
+    <div class="tile"><div class="label">Hunt cycles</div><div class="value" id="kRuns">-</div></div>
+  </section>
+  <section class="grid2">
+    <div class="card">
+      <h2>Leaderboard <span class="muted" style="font-weight:400" id="lbNote"></span></h2>
+      <div style="overflow-x:auto"><table>
+        <thead><tr><th>#</th><th>Strategy</th><th>Symbol</th><th title="Sharpe in-sample">SR in</th>
+          <th title="Sharpe out-of-sample">SR out</th><th title="Deflated Sharpe Ratio">DSR</th>
+          <th>CAGR</th><th>Max DD</th><th>Trades</th><th title="correlated variants that also passed">Var.</th><th>Signal</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table></div>
+      <div class="empty" id="empty" style="display:none">No winners yet. Start a hunt: <code>atsa demo</code> or <code>atsa run</code></div>
+    </div>
+    <div class="card">
+      <h2 id="dTitle">Select a strategy</h2>
+      <div id="detail"><div class="muted">Click a row to see its equity curve, rules and robustness report.</div></div>
+    </div>
+  </section>
+  <section class="card">
+    <h2>Hunt history</h2>
+    <div style="overflow-x:auto"><table>
+      <thead><tr><th>Run</th><th>Model</th><th>Data</th><th>Started (UTC)</th><th>Tested</th><th>Winners</th><th>Status</th></tr></thead>
+      <tbody id="runs"></tbody>
+    </table></div>
+  </section>
+</main>
+<footer>Research output, not financial advice. Backtests are hypothetical; paper-trade before risking capital.</footer>
+<script>
+const $ = (id) => document.getElementById(id);
+const fmt = (v, d = 2) => (v === null || v === undefined || isNaN(v)) ? "-" : Number(v).toFixed(d);
+const pct = (v) => (v === null || v === undefined) ? "-" : (v >= 0 ? "+" : "") + (v * 100).toFixed(1) + "%";
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const sig = (p) => p === 1 ? '<span class="pill long">LONG</span>' : p === -1 ? '<span class="pill short">SHORT</span>' : '<span class="pill flat">FLAT</span>';
+let selected = null;
+
+$("theme").onclick = () => {
+  const cur = document.documentElement.dataset.theme ||
+    (matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark");
+  document.documentElement.dataset.theme = cur === "light" ? "dark" : "light";
+  if (selected) loadDetail(selected);
+};
+$("showAll").onchange = refresh;
+$("group").onchange = refresh;
+
+function groupVariants(rows) {
+  if (!$("group").checked) return rows.map((r) => ({...r, nVariants: 1}));
+  const seen = new Map();
+  for (const r of rows) {  // rows arrive sorted by score: first of each idea cluster is its best variant
+    const c = r.result.cluster;
+    const k = c >= 0 ? `${r.symbol}|${r.run_id}|${c}` : r.key;
+    if (seen.has(k)) seen.get(k).nVariants += 1; else seen.set(k, {...r, nVariants: 1});
+  }
+  return [...seen.values()];
+}
+
+async function j(url) { const r = await fetch(url); if (!r.ok) throw new Error(r.status); return r.json(); }
+
+async function refresh() {
+  try {
+    const [s, rows, runs] = await Promise.all([j("/api/summary"),
+      j("/api/leaderboard?limit=300&all=" + $("showAll").checked), j("/api/runs?limit=15")]);
+    const shown = groupVariants(rows);
+    $("kWinners").textContent = s.winners; $("kTested").textContent = s.tested.toLocaleString();
+    $("kBest").textContent = fmt(s.best_oos_sharpe); $("kRuns").textContent = s.runs;
+    $("lbNote").textContent = ($("showAll").checked ? "all strategies" : "passed every robustness test") +
+      ($("group").checked ? " / best variant per idea" : "");
+    $("empty").style.display = shown.length ? "none" : "block";
+    $("rows").innerHTML = shown.slice(0, 100).map((r, i) => {
+      const x = r.result;
+      return `<tr data-key="${esc(r.key)}" class="${r.key === selected ? "sel" : ""}">
+        <td>${i + 1}</td><td class="name" title="${esc(x.name)}">${r.passed ? "" : '<span class="muted">x </span>'}${esc(x.name)}</td>
+        <td>${esc(x.symbol)}</td><td>${fmt(x.in_sample.sharpe)}</td><td><b>${fmt(x.out_of_sample.sharpe)}</b></td>
+        <td>${fmt(x.dsr)}</td><td>${pct(x.full.cagr)}</td><td>${(x.full.max_drawdown * 100).toFixed(0)}%</td>
+        <td>${x.full.trades}</td><td>${r.nVariants}</td><td>${sig(x.next_position)}</td></tr>`;
+    }).join("");
+    document.querySelectorAll("#rows tr").forEach((tr) => tr.onclick = () => loadDetail(tr.dataset.key));
+    $("runs").innerHTML = runs.map((r) => `<tr><td>#${r.id}</td><td>${esc(r.provider)}:${esc(r.model)}</td>
+      <td>${esc(r.source)} ${esc(r.symbols)}</td><td>${esc((r.started_at || "").replace("T", " ").replace("Z", ""))}</td>
+      <td>${r.tested}</td><td>${r.winners}</td><td>${esc(r.status)}</td></tr>`).join("");
+    $("updated").textContent = "updated " + new Date().toLocaleTimeString();
+    if (!selected && shown.length) loadDetail(shown[0].key);
+  } catch (e) { $("updated").textContent = "offline: " + e.message; }
+}
+
+function drawEquity(el, eq) {
+  const css = getComputedStyle(document.documentElement);
+  const W = el.clientWidth || 600, H = el.clientHeight || 240, L = 48, R = 12, T = 12, B = 24;
+  const lo = Math.min(...eq), hi = Math.max(...eq), pad = (hi - lo) * 0.06 || 0.05;
+  const y0 = lo - pad, y1 = hi + pad;
+  const X = (i) => L + (i / (eq.length - 1)) * (W - L - R);
+  const Y = (v) => T + (1 - (v - y0) / (y1 - y0)) * (H - T - B);
+  const ticks = 4, grid = [];
+  for (let k = 0; k <= ticks; k++) {
+    const v = y0 + (k / ticks) * (y1 - y0);
+    grid.push(`<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" stroke="${css.getPropertyValue("--grid")}" stroke-width="1"/>
+      <text x="${L - 6}" y="${Y(v) + 4}" text-anchor="end" font-size="11" fill="${css.getPropertyValue("--text-secondary")}">${v.toFixed(2)}x</text>`);
+  }
+  const d = eq.map((v, i) => `${i ? "L" : "M"}${X(i).toFixed(1)},${Y(v).toFixed(1)}`).join("");
+  const base = eq[0] >= y0 && eq[0] <= y1 ? `<line x1="${L}" x2="${W - R}" y1="${Y(1)}" y2="${Y(1)}" stroke="${css.getPropertyValue("--text-secondary")}" stroke-dasharray="3 3" stroke-width="1"/>` : "";
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Equity curve, growth of 1 unit">
+    ${grid.join("")}${base}
+    <path d="${d}" fill="none" stroke="${css.getPropertyValue("--series-1")}" stroke-width="2" stroke-linejoin="round"/>
+    <line id="xh" y1="${T}" y2="${H - B}" stroke="${css.getPropertyValue("--text-secondary")}" stroke-width="1" visibility="hidden"/>
+    <circle id="dot" r="4" fill="${css.getPropertyValue("--series-1")}" stroke="${css.getPropertyValue("--surface-1")}" stroke-width="2" visibility="hidden"/>
+    <rect x="${L}" y="${T}" width="${W - L - R}" height="${H - T - B}" fill="transparent" id="hit"/>
+    <text x="${L}" y="${H - 6}" font-size="11" fill="${css.getPropertyValue("--text-secondary")}">start</text>
+    <text x="${W - R}" y="${H - 6}" font-size="11" text-anchor="end" fill="${css.getPropertyValue("--text-secondary")}">today</text>
+  </svg><div class="tip" id="tip"></div>`;
+  const svg = el.querySelector("svg"), tip = el.querySelector("#tip");
+  el.querySelector("#hit").addEventListener("mousemove", (ev) => {
+    const r = svg.getBoundingClientRect(), x = (ev.clientX - r.left) * (W / r.width);
+    const i = Math.max(0, Math.min(eq.length - 1, Math.round((x - L) / (W - L - R) * (eq.length - 1))));
+    const xh = svg.querySelector("#xh"), dot = svg.querySelector("#dot");
+    xh.setAttribute("x1", X(i)); xh.setAttribute("x2", X(i)); xh.setAttribute("visibility", "visible");
+    dot.setAttribute("cx", X(i)); dot.setAttribute("cy", Y(eq[i])); dot.setAttribute("visibility", "visible");
+    tip.style.display = "block"; tip.innerHTML = `${eq[i].toFixed(3)}x <span class="muted">(${pct(eq[i] - 1)})</span>`;
+    tip.style.left = Math.min(X(i) / W * r.width + 10, r.width - 110) + "px"; tip.style.top = (Y(eq[i]) / H * r.height - 30) + "px";
+  });
+  el.querySelector("#hit").addEventListener("mouseleave", () => {
+    tip.style.display = "none"; svg.querySelector("#xh").setAttribute("visibility", "hidden");
+    svg.querySelector("#dot").setAttribute("visibility", "hidden");
+  });
+}
+
+async function loadDetail(key) {
+  selected = key;
+  document.querySelectorAll("#rows tr").forEach((tr) => tr.classList.toggle("sel", tr.dataset.key === key));
+  const r = await j("/api/strategy/" + encodeURIComponent(key));
+  const x = r.result, s = r.spec;
+  $("dTitle").innerHTML = `${esc(x.name)} <span class="muted" style="font-weight:400">${esc(x.symbol)} / ${esc(x.agent)}</span>`;
+  const rules = ["entry_long", "exit_long", "entry_short", "exit_short", "stop_loss", "take_profit", "max_hold_bars"]
+    .filter((k) => s[k] !== undefined && s[k] !== null).map((k) => `${k.padEnd(13)} ${s[k]}`).join("\n");
+  const m = (label, v) => `<div><span>${label}</span><b>${v}</b></div>`;
+  $("detail").innerHTML = `
+    <div class="muted" style="font-size:12px">Equity curve, growth of 1 unit after costs (hover for values)</div>
+    <div id="chart"></div>
+    <div class="${r.passed ? "verdict ok" : "verdict no"}">${r.passed ? "&#10003; Passed every robustness test" : "&#10007; Rejected: " + esc((x.reasons || []).join("; "))}</div>
+    <div class="metrics">
+      ${m("Sharpe in", fmt(x.in_sample.sharpe))}${m("Sharpe out", fmt(x.out_of_sample.sharpe))}
+      ${m("Deflated SR", fmt(x.dsr))}${m("SR @ 2x cost", fmt(x.stress_sharpe))}
+      ${m("CAGR", pct(x.full.cagr))}${m("Max DD", (x.full.max_drawdown * 100).toFixed(1) + "%")}
+      ${m("Win rate", (x.full.win_rate * 100).toFixed(0) + "%")}${m("Trades", x.full.trades)}
+      ${m("WF positive", (x.wf_positive * 100).toFixed(0) + "%")}${m("Buy & hold SR", fmt(x.benchmark_sharpe))}
+      ${m("Exposure", (x.full.exposure * 100).toFixed(0) + "%")}${m("Validated", r.times_validated + "x")}
+    </div>
+    <div><div class="muted" style="font-size:12px;margin-bottom:4px">Thesis</div>${esc(s.thesis || "-")}</div>
+    <pre>${esc(rules)}</pre>
+    <div class="muted" style="font-size:12px">Walk-forward Sharpe by period: ${(x.wf_sharpes || []).map((v) => fmt(v)).join(" / ")}</div>`;
+  if (r.equity && r.equity.length > 1) drawEquity($("chart"), r.equity);
+}
+
+refresh();
+setInterval(refresh, 30000);
+window.addEventListener("resize", () => selected && loadDetail(selected));
+</script>
+</body>
+</html>
